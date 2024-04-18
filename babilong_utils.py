@@ -51,6 +51,22 @@ def get_dataset_df(dataset_path, max_n_facts=None):
     return df
 
 
+def get_dataset_df_custom(dataset_path, max_len=None):
+    with open(dataset_path, 'r') as f:
+        texts = f.read().strip()
+        texts = texts.split('\n')
+        df = pd.DataFrame(texts, columns=['text'])
+    
+    if max_len is not None:
+        df = df.iloc[0:max_len]
+
+    df['answer'] = df.text
+    df['facts'] = df.text.apply(lambda x: f'The pass key is {x}. Remember it. {x} is the pass key. ')
+    df['question'] = df.text.apply(lambda x:f'There is an important pass key hidden inside a lot of irrelevant text. Find it and memorize it:\n')
+    df['sample_num'] = range(len(df))
+    
+    return df
+
 # babi task loader dataset
 class TaskDataset(Dataset):
     def __init__(self, dataset_path, max_n_facts=None):
@@ -68,6 +84,20 @@ class TaskDataset(Dataset):
     def __len__(self):
         return self.fact_dataset.sample_num.max()
     
+class TaskDatasetCustom(Dataset):
+    def __init__(self, dataset_path, max_n_facts=None, max_len=None):
+        self.fact_dataset = get_dataset_df_custom(dataset_path, max_len)
+
+    def __getitem__(self, ind):
+        slc = self.fact_dataset[self.fact_dataset.sample_num == ind]
+        sample = {'facts': slc.facts.values[-1],
+                  'question': slc.question.values[-1],
+                  'answer': slc.answer.values[-1],
+                  'references': []}
+        return sample
+    
+    def __len__(self):
+        return self.fact_dataset.sample_num.max()+1
 
 
 def sum_lengths(sentences):
@@ -163,9 +193,11 @@ class NoiseInjectionDataset(Dataset):
 
     def __getitem__(self, ind):
         sample = self.task_dataset[ind]
-        facts_tok = self.tokenizer(list(sample['facts']))['input_ids']
+        # facts_tok = self.tokenizer(list(sample['facts']))['input_ids'] # orig
+        facts_tok = self.tokenizer(list([sample['facts']]))['input_ids']
         question_tok = self.tokenizer(sample['question'])['input_ids']
         answer_tok = self.tokenizer(sample['answer'])['input_ids']
+        answer_tok.append(self.tokenizer.eos_token_id) # also added by me
 
         sample_size = self.get_sample_size()
         task_len = sum_lengths(facts_tok)
