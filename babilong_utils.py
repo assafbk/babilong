@@ -56,6 +56,7 @@ def get_dataset_df_custom(dataset_path, max_len=None):
         texts = f.read().strip()
         texts = texts.split('\n')
         df = pd.DataFrame(texts, columns=['text'])
+        df = df.sample(frac=1) # randomize order of keys
     
     if max_len is not None:
         df = df.iloc[0:max_len]
