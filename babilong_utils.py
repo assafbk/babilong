@@ -170,7 +170,22 @@ class SentenceSampler:
         if self.min_sentence_len is not None and len(tokenized) < self.min_sentence_len:
             return False
         return True
- 
+
+
+def find_needle_position(updated_sample):
+    num_of_chunks = [len(chunks) for chunks in updated_sample]
+    if num_of_chunks[-1] == 1:
+        needle_index = len(updated_sample)
+    else:
+        needle_index = num_of_chunks.index(2)
+    
+    needle_loc = 0
+    for i in range(needle_index):
+        needle_loc+=len(updated_sample[i][0])
+    
+    needle_loc = needle_loc + 4 # 'The pass key is XXXXX' - the key location is shifted 4 tokens from the start of the fact
+    return needle_loc
+
 
 # combined dataset for noisy babi QA
 # it's recommended to use sample_size >= 1024 
@@ -234,6 +249,8 @@ class NoiseInjectionDataset(Dataset):
 
         for i, s in enumerate(background_text):
             updated_sample[i].append(s)
+
+        sample['needle_position'] = find_needle_position(updated_sample)
 
         flat = [i for s in updated_sample for i in s]
         tokens = [i for s in flat for i in s]
